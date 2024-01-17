@@ -10,6 +10,7 @@
     "vite": "^5.0.11"
   },
   "dependencies": {
-    "ol": "latest"
+    "ol": "latest",
+    "socket.io-client": "^4.7.4"
   }
 }

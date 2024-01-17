@@ -5,6 +5,7 @@ import OSM from 'ol/source/OSM';
 import {Point} from 'ol/geom.js';
 import {Vector as VectorLayer} from 'ol/layer.js';
 import {Vector as VectorSource} from 'ol/source.js';
+import {EventEmitter} from 'events';
 
 function getRandomPoint(){
   const generateRandomPointWithinBounds = (point1, point2, point3, point4) => {
@@ -31,7 +32,8 @@ function getRandomPoint(){
 
 const place = getRandomPoint();
 const point = new Point(place);
-let pointsArray = [new Feature(point)];
+let currentFeature = new Feature(point);
+let pointsArray = [currentFeature];
 
 const pointsSource = new VectorSource({
   features: pointsArray,
@@ -44,10 +46,22 @@ const pointsLayer = new VectorLayer({
   },
 });
 
+const eventEmitter = new EventEmitter();
+
+// Listener function
+function onEventHandled(data) {
+  console.log('Event handled:', data);
+}
+
+// Register the listener for the 'customEvent' event
+eventEmitter.on('incidentEvent', onEventHandled);
+
 setTimeout(()=>{
+  pointsSource.removeFeature(currentFeature);
   const place2 = getRandomPoint();
   const point2 = new Point(place2);
-  pointsSource.addFeature(new Feature(point2));
+  currentFeature = new Feature(point2);
+  pointsSource.addFeature(currentFeature);
   // pointsLayer.setSource(pointsSource);
 },5000);
 
