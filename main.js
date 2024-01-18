@@ -5,7 +5,6 @@ import OSM from 'ol/source/OSM';
 import {Point} from 'ol/geom.js';
 import {Vector as VectorLayer} from 'ol/layer.js';
 import {Vector as VectorSource} from 'ol/source.js';
-import {EventEmitter} from 'events';
 
 function getRandomPoint(){
   const generateRandomPointWithinBounds = (point1, point2, point3, point4) => {
@@ -46,24 +45,29 @@ const pointsLayer = new VectorLayer({
   },
 });
 
-const eventEmitter = new EventEmitter();
-
 // Listener function
-function onEventHandled(data) {
+function onEventHandled(dataString) {
+  const data = JSON.parse(dataString);
   console.log('Event handled:', data);
+
+  setTimeout(()=>{
+    pointsSource.removeFeature(currentFeature);
+    // const place2 = getRandomPoint();
+    const point2 = new Point(data.location);
+    currentFeature = new Feature(point2);
+    pointsSource.addFeature(currentFeature);
+    // pointsLayer.setSource(pointsSource);
+  },data.incidentTTL);
 }
 
-// Register the listener for the 'customEvent' event
-eventEmitter.on('incidentEvent', onEventHandled);
-
-setTimeout(()=>{
-  pointsSource.removeFeature(currentFeature);
-  const place2 = getRandomPoint();
-  const point2 = new Point(place2);
-  currentFeature = new Feature(point2);
-  pointsSource.addFeature(currentFeature);
-  // pointsLayer.setSource(pointsSource);
-},5000);
+// setTimeout(()=>{
+//   pointsSource.removeFeature(currentFeature);
+//   const place2 = getRandomPoint();
+//   const point2 = new Point(place2);
+//   currentFeature = new Feature(point2);
+//   pointsSource.addFeature(currentFeature);
+//   // pointsLayer.setSource(pointsSource);
+// },5000);
 
 const map = new Map({
   target: 'map',
@@ -75,7 +79,7 @@ const map = new Map({
   ],
   view: new View({
     center: [11576030.93506485,150934.52190890713],
-    zoom: 15,
+    zoom: 16,
     rotation: 1.16
   })
 });
@@ -133,4 +137,29 @@ map.on('click', function(event){
     popover.show();
     popoverTimeout();
   }
-)
+);
+
+const socket = new WebSocket('ws://localhost:3000/ws');
+
+// Connection opened
+socket.addEventListener('open', (event) => {
+  console.log('WebSocket connection opened');
+  // Send a message to the server
+  socket.send('Hello from the client!');
+});
+
+// Listen for messages from the server
+socket.addEventListener('message', (event) => {
+  console.log('WebSocket message received:', event.data);
+  onEventHandled(event.data);
+});
+
+// Connection closed
+socket.addEventListener('close', (event) => {
+  console.log('WebSocket connection closed:', event);
+});
+
+// Connection error
+socket.addEventListener('error', (event) => {
+  console.error('WebSocket error:', event);
+});
