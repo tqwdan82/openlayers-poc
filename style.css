@@ -10,3 +10,51 @@ html, body {
   bottom: 0;
   width: 100%;
 }
+
+.list-group {
+  transform: rotate(180deg);
+}
+
+.list-group li:last-child {
+  background-color: rgb(165, 151, 0)!important;;
+}
+
+.list-group-item {
+  padding: 4px;
+  transform: rotate(-180deg);
+  cursor: pointer;
+  color: white;
+  background-color: RGBA(33,37,41,var(--bs-bg-opacity,1))!important;
+}
+
+.list-group-item:hover {
+  color: white!important;
+  background-color: #757575!important;
+}
+
+#card-event-history {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 40vh;
+  width: 400px;
+  margin: .5em;
+}
+
+#card-event-info {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  height: 20vh;
+  width: 400px;
+  margin: .5em;
+  /* display: none; */
+}
+
+#card-event-info-body tr td:first-child {
+  width: 100px;
+}
+
+.card-title {
+  text-transform: capitalize;
+}
