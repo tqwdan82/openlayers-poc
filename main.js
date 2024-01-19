@@ -21,7 +21,7 @@ const pointsSource = new VectorSource({
 const pointsLayer = new VectorLayer({
   source: pointsSource,
   style: {
-    'icon-src': 'static/flame.png',
+    'icon-src': '/flame.png',
     'icon-anchor': [0.5, 0.5],
     'icon-height': 26,
   },
