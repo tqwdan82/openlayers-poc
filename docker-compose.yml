@@ -1,0 +1,28 @@
+version: '3'
+
+services:
+  backend:
+    container_name: map-backend-poc
+    build: 
+      context: ../map-backend-poc/
+      dockerfile: Dockerfile
+    ports:
+      - 3000:3000
+    networks:
+      - op-poc
+
+  frontend:
+    depends_on:
+      - backend
+    container_name: openlayers-frontend-poc
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - 5173:5173
+    networks:
+      - op-poc
+
+networks:
+  op-poc:
+    driver: bridge

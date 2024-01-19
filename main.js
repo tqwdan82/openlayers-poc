@@ -29,19 +29,27 @@ function getRandomPoint(){
   return randomPoint;
 }
 
+const list_event_history = document.getElementById("list-event-history");
+
 const place = getRandomPoint();
 const point = new Point(place);
-let currentFeature = new Feature(point);
+
+let currentFeature = new Feature({
+  geometry: point,
+});
+
 let pointsArray = [currentFeature];
 
 const pointsSource = new VectorSource({
   features: pointsArray,
 });
+
 const pointsLayer = new VectorLayer({
   source: pointsSource,
   style: {
-    'circle-radius': 9,
-    'circle-fill-color': 'red',
+    'icon-src': 'static/flame.png',
+    'icon-anchor': [0.5, 0.5],
+    'icon-height': 26,
   },
 });
 
@@ -54,10 +62,17 @@ function onEventHandled(dataString) {
     pointsSource.removeFeature(currentFeature);
     // const place2 = getRandomPoint();
     const point2 = new Point(data.location);
-    currentFeature = new Feature(point2);
+    currentFeature =new Feature({
+      geometry: point2
+    });
     pointsSource.addFeature(currentFeature);
     // pointsLayer.setSource(pointsSource);
-  },data.incidentTTL);
+
+    var li = document.createElement("li");
+    li.appendChild(document.createTextNode(data.location));
+    list_event_history.appendChild(li);
+
+  }, data.incidentTTL);
 }
 
 // setTimeout(()=>{
@@ -69,19 +84,38 @@ function onEventHandled(dataString) {
 //   // pointsLayer.setSource(pointsSource);
 // },5000);
 
+const osmTileLayer = new TileLayer({
+  source: new OSM()
+});
+
+osmTileLayer.on('prerender', (e) => {
+  if (e.context) {
+    // enable dark mode filter
+    const context = e.context;
+    context.filter = 'grayscale(80%) invert(100%) ';
+    context.globalCompositeOperation = 'source-over';
+  }
+});
+
+osmTileLayer.on('postrender', (e) => {
+  if (e.context) {
+    // disable dark mode filter
+    const context = e.context;
+    context.filter = 'none';
+  }
+});
+
 const map = new Map({
   target: 'map',
   layers: [
-    new TileLayer({
-      source: new OSM()
-    }),
+    osmTileLayer,
     pointsLayer,
   ],
   view: new View({
     center: [11576030.93506485,150934.52190890713],
     zoom: 16,
-    rotation: 1.16
-  })
+    rotation: 1.16,
+  }),
 });
 
 const element = document.getElementById('popup');
@@ -122,7 +156,7 @@ map.on('click', function(event){
     }
     const coordinate = feature.getGeometry().getCoordinates();
     popup.setPosition([
-      coordinate[0] ,
+      coordinate[0],
       coordinate[1],
     ]);
   
