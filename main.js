@@ -12,12 +12,12 @@ const airport = [11576030.93506485, 150934.52190890713];
 
 let currentPoint = airport;
 let currentFeature;
+let focusFeature;
 let pointsArray = [];
 
 const pointsSource = new VectorSource({
   features: pointsArray,
 });
-
 const pointsLayer = new VectorLayer({
   source: pointsSource,
   style: {
@@ -28,7 +28,22 @@ const pointsLayer = new VectorLayer({
 });
 
 const osmTileLayer = new TileLayer({
-  source: new OSM()
+  source: new OSM(),
+});
+osmTileLayer.on('prerender', (e) => {
+  if (e.context) {
+    // enable dark mode filter
+    const context = e.context;
+    context.filter = 'grayscale(80%) invert(100%) ';
+    context.globalCompositeOperation = 'source-over';
+  }
+});
+osmTileLayer.on('postrender', (e) => {
+  if (e.context) {
+    // disable dark mode filter
+    const context = e.context;
+    context.filter = 'none';
+  }
 });
 
 const view = new View({
@@ -46,12 +61,12 @@ const map = new Map({
   view: view,
 });
 
-const element = document.getElementById('popup');
 
-const list_event_history = document.getElementById("list-event-history");
-const card_event_detail = document.getElementById("card-event-info");
-const event_detail_locate = document.getElementById("event-detail-locate");
-const event_detail_close = document.getElementById("event-detail-close");
+const popup = document.getElementById('popup');
+const ListEventHistory = document.getElementById("list-event-history");
+const cardEventDetail = document.getElementById("card-event-info");
+const eventDetailLocate = document.getElementById("event-detail-locate");
+const eventDetailClose = document.getElementById("event-detail-close");
 
 // function getRandomPoint() {
 //   const generateRandomPointWithinBounds = (point1, point2, point3, point4) => {
@@ -82,8 +97,6 @@ const event_detail_close = document.getElementById("event-detail-close");
 // let currentFeature = new Feature({
 //   geometry: point,
 // });
-
-
 
 // Listener function
 function onEventHandled(dataString) {
@@ -116,11 +129,9 @@ function onEventHandled(dataString) {
     li.addEventListener('click', evt => {
       openDetailCard(data.incidentType, data.location);
     })
-    list_event_history.appendChild(li);
+    ListEventHistory.appendChild(li);
   }, data.incidentTTL);
 }
-
-let focusFeature;
 
 function panToLocation(location) {
   if (focusFeature) {
@@ -152,11 +163,11 @@ function panToLocation(location) {
   });
 }
 
-event_detail_locate.addEventListener('click', ev => {
+eventDetailLocate.addEventListener('click', ev => {
   panToLocation(currentFeature ? currentPoint : airport);
 });
 
-event_detail_close.addEventListener('click', ev => {
+eventDetailClose.addEventListener('click', ev => {
   if (focusFeature) {
     pointsSource.removeFeature(focusFeature);
   }
@@ -166,46 +177,28 @@ event_detail_close.addEventListener('click', ev => {
     easing: easeOut,
     zoom: 16,
   });
-  card_event_detail.classList.add("invisible");
+  cardEventDetail.classList.add("invisible");
 });
 
 function openDetailCard(type, location) {
   if (focusFeature) {
     pointsSource.removeFeature(focusFeature);
   }
-  card_event_detail.classList.remove("invisible");
+  cardEventDetail.classList.remove("invisible");
   // fill detail card
   currentPoint = location
   document.getElementById("event-info-event-type").innerHTML = type;
   document.getElementById("event-info-event-location").innerHTML = location;
-  
+
   // focus on point
   panToLocation(location);
 }
 
-osmTileLayer.on('prerender', (e) => {
-  if (e.context) {
-    // enable dark mode filter
-    const context = e.context;
-    context.filter = 'grayscale(80%) invert(100%) ';
-    context.globalCompositeOperation = 'source-over';
-  }
-});
-
-osmTileLayer.on('postrender', (e) => {
-  if (e.context) {
-    // disable dark mode filter
-    const context = e.context;
-    context.filter = 'none';
-  }
-});
-
-
-const popup = new Overlay({
-  element: element,
+const popupOverlay = new Overlay({
+  element: popup,
   stopEvent: false,
 });
-map.addOverlay(popup);
+map.addOverlay(popupOverlay);
 
 function formatCoordinate(coordinate) {
   return `
@@ -236,13 +229,13 @@ map.on('click', function (event) {
     return;
   }
   const coordinate = feature.getGeometry().getCoordinates();
-  popup.setPosition([
+  popupOverlay.setPosition([
     coordinate[0],
     coordinate[1],
   ]);
 
-  popover = new bootstrap.Popover(element, {
-    container: element.parentElement,
+  popover = new bootstrap.Popover(popup, {
+    container: popup.parentElement,
     content: formatCoordinate(coordinate),
     html: true,
     offset: [0, 0],
