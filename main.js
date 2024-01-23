@@ -5,27 +5,22 @@ import OSM from 'ol/source/OSM';
 import { Point } from 'ol/geom.js';
 import { Vector as VectorLayer } from 'ol/layer.js';
 import { Vector as VectorSource } from 'ol/source.js';
-import { easeIn, easeOut } from 'ol/easing.js';
-import { Circle as CircleStyle, Fill, Stroke, Style } from 'ol/style.js';
+import { easeOut } from 'ol/easing.js';
+import { Style } from 'ol/style.js';
+import data from './data.json';
+import GeoJSON from 'ol/format/GeoJSON.js';
 
-const airport = [11576030.93506485, 150934.52190890713];
+import { EventHistory } from './event-history';
+import { EventDetail } from './event-detail';
+import { CustomStyles } from './style';
+import { FLight } from './flight';
+
+const airport = data.airport;
 
 let currentPoint = airport;
 let currentFeature;
 let focusFeature;
 let pointsArray = [];
-
-const pointsSource = new VectorSource({
-  features: pointsArray,
-});
-const pointsLayer = new VectorLayer({
-  source: pointsSource,
-  style: {
-    'icon-src': '/flame.png',
-    'icon-anchor': [0.5, 0.5],
-    'icon-height': 26,
-  },
-});
 
 const osmTileLayer = new TileLayer({
   source: new OSM(),
@@ -46,57 +41,71 @@ osmTileLayer.on('postrender', (e) => {
   }
 });
 
+const pointsVectorLayer = new VectorLayer({
+  source: new VectorSource({
+    features: pointsArray,
+  }),
+  style: {
+    'icon-src': '/flame.png',
+    'icon-anchor': [0.5, 0.5],
+    'icon-height': 26,
+  },
+});
+
+const roadVectorLayer = new VectorLayer({
+  source: new VectorSource({
+    features: new GeoJSON().readFeatures(data.road_network),
+  }),
+  style: {
+    'stroke-color': '#0B4F21',
+    'stroke-width': 5,
+  }
+})
+
+const airVectorLayer = new VectorLayer({
+  source: new VectorSource(),
+  style: {
+    'icon-src': '/plane.png',
+    'icon-anchor': [0.5, 0.5],
+    'icon-height': 36,
+    "icon-rotation": 1.55
+  }
+})
+
 const view = new View({
   center: airport,
   zoom: 16,
-  rotation: 1.16,
+  rotation: 1.17,
 });
 
 const map = new Map({
   target: 'map',
   layers: [
     osmTileLayer,
-    pointsLayer,
+    roadVectorLayer,
+    airVectorLayer,
+    pointsVectorLayer,
   ],
   view: view,
 });
 
-
+const listEventHistory = new EventHistory("list-event-history");
+const eventDetail = new EventDetail("card-event-info",
+  _ => {
+    panToLocation(currentFeature ? currentPoint : airport);
+  },
+  _ => {
+    if (focusFeature) {
+      pointsVectorLayer.getSource().removeFeature(focusFeature);
+    }
+    view.animate({
+      center: airport,
+      duration: 800,
+      easing: easeOut,
+      zoom: 16,
+    });
+  });
 const popup = document.getElementById('popup');
-const ListEventHistory = document.getElementById("list-event-history");
-const cardEventDetail = document.getElementById("card-event-info");
-const eventDetailLocate = document.getElementById("event-detail-locate");
-const eventDetailClose = document.getElementById("event-detail-close");
-
-// function getRandomPoint() {
-//   const generateRandomPointWithinBounds = (point1, point2, point3, point4) => {
-//     const minX = Math.min(point1[0], point2[0], point3[0], point4[0]);
-//     const minY = Math.min(point1[1], point2[1], point3[1], point4[1]);
-//     const maxX = Math.max(point1[0], point2[0], point3[0], point4[0]);
-//     const maxY = Math.max(point1[1], point2[1], point3[1], point4[1]);
-
-//     const randomX = minX + Math.random() * (maxX - minX);
-//     const randomY = minY + Math.random() * (maxY - minY);
-
-//     return [randomX, randomY];
-//   };
-
-//   const point1 = [11575030.372665226, 150116.2697379953];
-//   const point2 = [11576008.25991508, 152472.91197662777];
-//   const point3 = [11575780.569510564, 149733.91803992068];
-//   const point4 = [11576785.687300716, 152169.0202072112];
-
-//   const randomPoint = generateRandomPointWithinBounds(point1, point2, point3, point4);
-//   console.log("Random Point:", randomPoint);
-//   return randomPoint;
-// }
-
-// const place = getRandomPoint();
-// const point = new Point(place);
-
-// let currentFeature = new Feature({
-//   geometry: point,
-// });
 
 // Listener function
 function onEventHandled(dataString) {
@@ -104,57 +113,39 @@ function onEventHandled(dataString) {
     return;
   }
   const data = JSON.parse(dataString);
-  console.log('Event handled:', data);
+  // console.log('Event handled:', data);
 
   setTimeout(() => {
     if (currentFeature !== undefined) {
-      pointsSource.removeFeature(currentFeature);
+      pointsVectorLayer.getSource().removeFeature(currentFeature);
     }
 
     currentFeature = new Feature({
       geometry: new Point(data.location)
     });
-    pointsSource.addFeature(currentFeature);
+    pointsVectorLayer.getSource().addFeature(currentFeature);
 
     // Append to hist list
-    var li = document.createElement("li");
-    const event_date = new Date(data.timestamp);
-    const formate_date = event_date.getDate() + "/" + event_date.getMonth() + 1 + " " + event_date.getHours() + ":" + event_date.getMinutes() + ":" + event_date.getSeconds();
-    li.classList.add("list-group-item");
-    li.classList.add("list-group-item-action");
-    li.classList.add("list-group-item-dark");
-    li.appendChild(document.createTextNode(`
-    [${formate_date}][${data.incidentType}] ${data.location}
-    `));
-    li.addEventListener('click', evt => {
+    listEventHistory.addHistory(data.timestamp, data.incidentType, data.location, (evt) => {
       openDetailCard(data.incidentType, data.location);
     })
-    ListEventHistory.appendChild(li);
   }, data.incidentTTL);
 }
 
 function panToLocation(location) {
   if (focusFeature) {
-    pointsSource.removeFeature(focusFeature);
+    pointsVectorLayer.getSource().removeFeature(focusFeature);
   }
+  currentPoint = location;
   focusFeature = new Feature({
     geometry: new Point(location),
   });
   focusFeature.setStyle(
     new Style({
-      image: new CircleStyle({
-        radius: 6,
-        fill: new Fill({
-          color: '#3399CC',
-        }),
-        stroke: new Stroke({
-          color: '#fff',
-          width: 2,
-        }),
-      }),
+      image: CustomStyles.event_point
     })
   );
-  pointsSource.addFeature(focusFeature);
+  pointsVectorLayer.getSource().addFeature(focusFeature);
   view.animate({
     center: location,
     duration: 800,
@@ -163,33 +154,11 @@ function panToLocation(location) {
   });
 }
 
-eventDetailLocate.addEventListener('click', ev => {
-  panToLocation(currentFeature ? currentPoint : airport);
-});
-
-eventDetailClose.addEventListener('click', ev => {
-  if (focusFeature) {
-    pointsSource.removeFeature(focusFeature);
-  }
-  view.animate({
-    center: airport,
-    duration: 800,
-    easing: easeOut,
-    zoom: 16,
-  });
-  cardEventDetail.classList.add("invisible");
-});
-
 function openDetailCard(type, location) {
   if (focusFeature) {
-    pointsSource.removeFeature(focusFeature);
+    pointsVectorLayer.getSource().removeFeature(focusFeature);
   }
-  cardEventDetail.classList.remove("invisible");
-  // fill detail card
-  currentPoint = location
-  document.getElementById("event-info-event-type").innerHTML = type;
-  document.getElementById("event-info-event-location").innerHTML = location;
-
+  eventDetail.show(type, location)
   // focus on point
   panToLocation(location);
 }
@@ -218,8 +187,30 @@ let popoverTimeout = () => {
   }, 3000);
 };
 
+var pos = [];
+function generate(input) {
+  var template = {
+    "type": "Feature",
+    "geometry": {
+      "type": "LineString",
+      "coordinates": []
+    }
+  }
+  let output = []
+  for (let i = 0; i < input.length - 1; i++) {
+    let tmp = structuredClone(template);
+    tmp.geometry.coordinates = [
+      input[i],
+      input[i + 1]
+    ]
+    output.push(tmp);
+  }
+  console.log(output);
+}
+
 map.on('click', function (event) {
-  console.log(event);
+  pos.push(event.coordinate);
+  generate(pos)
   if (popover) {
     popover.dispose();
     popover = undefined;
@@ -244,30 +235,119 @@ map.on('click', function (event) {
   });
   popover.show();
   popoverTimeout();
+});
+
+function randomIntRange(min, max) {
+  return Math.floor(Math.random() * (max - min) + min)
 }
-);
+
+function updateTraficConfition() {
+  var trafficGeometries = roadVectorLayer.getSource().getFeatures();
+  var trafficFeatures = trafficGeometries;
+  var trafficConditions = [CustomStyles.traffic_bad, CustomStyles.traffic_poor, CustomStyles.traffic_poor, CustomStyles.traffic_ok, CustomStyles.traffic_ok, CustomStyles.traffic_ok]
+  if (trafficFeatures.length < 1) {
+    return;
+  }
+
+  var randomRange = []
+  for (let i = 0; i < randomIntRange(1, 4); i++) {
+    randomRange.push(randomIntRange(0, trafficGeometries.length));
+  }
+
+  randomRange.forEach(idx => {
+    setTimeout(() => {
+      var conditionIndex = randomIntRange(0, trafficConditions.length);
+      trafficFeatures[idx].setStyle(new Style({
+        stroke: trafficConditions[conditionIndex]
+      }));
+      // console.log(`[Traffic update] segment:${idx} setCondition:${trafficConditions[conditionIndex].getColor()}`);
+      if (conditionIndex == 0 && idx > 1 && idx < trafficFeatures.length - 2) {
+        trafficFeatures[idx - 1].setStyle(new Style({
+          stroke: CustomStyles.traffic_poor
+        }));
+        // console.log(`[Traffic update] segment:${idx-1},${idx+1} setCondition:${trafficConditions[1].getColor()}`);
+      }
+    }, 1000);
+  });
+}
+
+var activeNorthFlights = [];
+var activeSouthFlights = [];
+function updateFlights() {
+  activeNorthFlights.forEach(flight => {
+    if (flight.active) {
+      flight.update()
+    } else {
+      airVectorLayer.getSource().removeFeature(flight.plane);
+      activeNorthFlights.pop();
+    }
+  });
+  activeSouthFlights.forEach(flight => {
+    if (flight.active) {
+      flight.update()
+    } else {
+      airVectorLayer.getSource().removeFeature(flight.plane);
+      activeSouthFlights.pop();
+    }
+  });
+
+  var step = randomIntRange(50, 70);
+  var randomSpawn = randomIntRange(0, 2);
+  if (randomSpawn == 1 && activeNorthFlights.length < 1) {
+    console.log("Spawn flights North");
+    var start = data.air_routes[0].start;
+    var end = data.air_routes[0].end;
+    var newFlightFeature = new Feature({
+      geometry: new Point(start)
+    });
+
+    airVectorLayer.getSource().addFeature(newFlightFeature);
+    var newFlight = new FLight(newFlightFeature, start, end, step);
+    activeNorthFlights.push(newFlight);
+  }
+
+  randomSpawn = randomIntRange(0, 2);
+  if (randomSpawn == 1 && activeSouthFlights.length < 1) {
+    console.log("Spawn flights South");
+    var start = data.air_routes[1].start;
+    var end = data.air_routes[1].end;
+    var newFlightFeature = new Feature({
+      geometry: new Point(start)
+    });
+
+    airVectorLayer.getSource().addFeature(newFlightFeature);
+    var newFlight = new FLight(newFlightFeature, start, end, step);
+    activeSouthFlights.push(newFlight);
+  }
+}
+
+window.setInterval(updateTraficConfition, randomIntRange(2000, 8000));
+window.setInterval(updateFlights, randomIntRange(2000, 3000));
+//==================================
+// SOCKETS
+//==================================
 
 const socket = new WebSocket('ws://localhost:3000/ws');
 
 // Connection opened
 socket.addEventListener('open', (event) => {
-  console.log('WebSocket connection opened');
+  // console.log('WebSocket connection opened');
   // Send a message to the server
   socket.send('Hello from the client!');
 });
 
 // Listen for messages from the server
 socket.addEventListener('message', (event) => {
-  console.log('WebSocket message received:', event.data);
+  // console.log('WebSocket message received:', event.data);
   onEventHandled(event.data);
 });
 
 // Connection closed
 socket.addEventListener('close', (event) => {
-  console.log('WebSocket connection closed:', event);
+  // console.log('WebSocket connection closed:', event);
 });
 
 // Connection error
 socket.addEventListener('error', (event) => {
-  console.error('WebSocket error:', event);
+  // console.error('WebSocket error:', event);
 });
