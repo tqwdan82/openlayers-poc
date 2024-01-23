@@ -5,15 +5,15 @@ import OSM from 'ol/source/OSM';
 import { Point } from 'ol/geom.js';
 import { Vector as VectorLayer } from 'ol/layer.js';
 import { Vector as VectorSource } from 'ol/source.js';
-import { easeIn, easeOut } from 'ol/easing.js';
-import { Circle as CircleStyle, Fill, Stroke, Style } from 'ol/style.js';
-import Draw from 'ol/interaction/Draw.js';
+import { easeOut } from 'ol/easing.js';
+import { Style } from 'ol/style.js';
 import data from './data.json';
 import GeoJSON from 'ol/format/GeoJSON.js';
 
 import { EventHistory } from './event-history';
 import { EventDetail } from './event-detail';
 import { CustomStyles } from './style';
+import { FLight } from './flight';
 
 const airport = data.airport;
 
@@ -63,14 +63,7 @@ const roadVectorLayer = new VectorLayer({
 })
 
 const airVectorLayer = new VectorLayer({
-  source: new VectorSource({
-    features: [new Feature({
-      geometry: new Point([
-        11575321.434394632,
-        150585.69645282626
-    ]),
-    })]
-  }),
+  source: new VectorSource(),
   style: {
     'icon-src': '/plane.png',
     'icon-anchor': [0.5, 0.5],
@@ -95,7 +88,6 @@ const map = new Map({
   ],
   view: view,
 });
-
 
 const listEventHistory = new EventHistory("list-event-history");
 const eventDetail = new EventDetail("card-event-info",
@@ -252,40 +244,85 @@ function randomIntRange(min, max) {
 function updateTraficConfition() {
   var trafficGeometries = roadVectorLayer.getSource().getFeatures();
   var trafficFeatures = trafficGeometries;
-  var trafficConditions = [CustomStyles.traffic_bad, CustomStyles.traffic_poor, CustomStyles.traffic_ok, CustomStyles.traffic_ok]
+  var trafficConditions = [CustomStyles.traffic_bad, CustomStyles.traffic_poor, CustomStyles.traffic_poor, CustomStyles.traffic_ok, CustomStyles.traffic_ok, CustomStyles.traffic_ok]
   if (trafficFeatures.length < 1) {
     return;
   }
 
-  var randomRange = [] 
-  for (let i = 0; i < randomIntRange(1,4); i++) {
+  var randomRange = []
+  for (let i = 0; i < randomIntRange(1, 4); i++) {
     randomRange.push(randomIntRange(0, trafficGeometries.length));
   }
-  
+
   randomRange.forEach(idx => {
-    var conditionIndex = randomIntRange(0, trafficConditions.length);
-    trafficFeatures[idx].setStyle(new Style({
-      stroke: trafficConditions[conditionIndex]
-    }));
-    console.log(`[Traffic update] segment:${idx} setCondition:${trafficConditions[conditionIndex].getColor()}`);
-    if (conditionIndex == 0 && idx > 1 && idx < trafficFeatures.length - 2) {
-      trafficFeatures[idx-1].setStyle(new Style({
-        stroke: CustomStyles.traffic_poor
+    setTimeout(() => {
+      var conditionIndex = randomIntRange(0, trafficConditions.length);
+      trafficFeatures[idx].setStyle(new Style({
+        stroke: trafficConditions[conditionIndex]
       }));
-      trafficFeatures[idx+1].setStyle(new Style({
-        stroke: CustomStyles.traffic_poor
-      }));
-      // console.log(`[Traffic update] segment:${idx-1},${idx+1} setCondition:${trafficConditions[1].getColor()}`);
-    }
+      // console.log(`[Traffic update] segment:${idx} setCondition:${trafficConditions[conditionIndex].getColor()}`);
+      if (conditionIndex == 0 && idx > 1 && idx < trafficFeatures.length - 2) {
+        trafficFeatures[idx - 1].setStyle(new Style({
+          stroke: CustomStyles.traffic_poor
+        }));
+        // console.log(`[Traffic update] segment:${idx-1},${idx+1} setCondition:${trafficConditions[1].getColor()}`);
+      }
+    }, 1000);
   });
 }
 
-function spawnFlights() {
-  
+var activeNorthFlights = [];
+var activeSouthFlights = [];
+function updateFlights() {
+  activeNorthFlights.forEach(flight => {
+    if (flight.active) {
+      flight.update()
+    } else {
+      airVectorLayer.getSource().removeFeature(flight.plane);
+      activeNorthFlights.pop();
+    }
+  });
+  activeSouthFlights.forEach(flight => {
+    if (flight.active) {
+      flight.update()
+    } else {
+      airVectorLayer.getSource().removeFeature(flight.plane);
+      activeSouthFlights.pop();
+    }
+  });
+
+  var step = randomIntRange(50, 70);
+  var randomSpawn = randomIntRange(0, 2);
+  if (randomSpawn == 1 && activeNorthFlights.length < 1) {
+    console.log("Spawn flights North");
+    var start = data.air_routes[0].start;
+    var end = data.air_routes[0].end;
+    var newFlightFeature = new Feature({
+      geometry: new Point(start)
+    });
+
+    airVectorLayer.getSource().addFeature(newFlightFeature);
+    var newFlight = new FLight(newFlightFeature, start, end, step);
+    activeNorthFlights.push(newFlight);
+  }
+
+  randomSpawn = randomIntRange(0, 2);
+  if (randomSpawn == 1 && activeSouthFlights.length < 1) {
+    console.log("Spawn flights South");
+    var start = data.air_routes[1].start;
+    var end = data.air_routes[1].end;
+    var newFlightFeature = new Feature({
+      geometry: new Point(start)
+    });
+
+    airVectorLayer.getSource().addFeature(newFlightFeature);
+    var newFlight = new FLight(newFlightFeature, start, end, step);
+    activeSouthFlights.push(newFlight);
+  }
 }
 
 window.setInterval(updateTraficConfition, randomIntRange(2000, 8000));
-window.setInterval(spawnFlights, randomIntRange(2000, 8000));
+window.setInterval(updateFlights, randomIntRange(2000, 3000));
 //==================================
 // SOCKETS
 //==================================
